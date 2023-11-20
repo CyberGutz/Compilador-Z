@@ -87,7 +87,7 @@ class Lexico:
         else:
             self.arquivo.close()
 
-    def getchar(self):
+    def getChar(self):
         if self.arquivo is None:
             print('ERRO: Não há arquivo aberto')
             quit()
@@ -110,19 +110,210 @@ class Lexico:
         lexema = ''
         estado = 1
         car = None
-        while(True):
+        while (True):
+            # Estado Inicial
             if estado == 1:
                 car = self.getChar()
                 if car is None:
                     return Token(TokenType.FIMARQ, '<eof>', self.linha)
+                # Se o caracter for qualquer caracter de espaçamento
                 elif re.match(r'\s', car):
                     if car == '\n':
                         self.linha = self.linha + 1
+                # Se o caracter for parte do alfabeto, sem caracter especial (ç, ã, õ, etc)
                 elif car.isalpha():
                     estado = 2
+                # Se o caracter for um dígito 0-9
                 elif car.isdigit():
                     estado = 3
-                elif re.match(r'[=/+*()]', car):
-                    estado = 4
-                elif car == '#':
+                # ATRIB
+                elif car == '=':
+                    # Verifica se o igual é de igual ou de atribuição
+                    lexema = lexema + car
+                    car = self.getChar()
+                    lexema = lexema + car
+                    if lexema == '==':
+                        return Token(TokenType.OPREL, lexema, self.linha)
+                    else:
+                        self.ungetChar(car)
+                        lexema = '='
+                        estado = 4
+                # CADEIA
+                elif car == '"':
                     estado = 5
+                # OPREL
+                elif car in {'>', '<'}:
+                    estado = 6
+                # OPAD
+                elif re.match(r'[+-]', car):
+                    estado = 7
+                # OPMUL
+                elif car == '*':
+                    estado = 8
+                # OPNEG
+                elif car == '!':
+                    estado = 9
+                # PVIRG
+                elif car == ';':
+                    estado = 10
+                # DPONTOS
+                elif car == ':':
+                    estado = 11
+                # VIRG
+                elif car == ',':
+                    estado = 12
+                # ABREPAR
+                elif car == '(':
+                    estado = 13
+                # FECHAPAR
+                elif car == ')':
+                    estado = 14
+                # ABRECH
+                elif car == '{':
+                    estado = 15
+                # FECHACH
+                elif car == '}':
+                    estado = 16
+                # Verificar comentário
+                elif car == '/':
+                    estado = 17
+
+            elif estado == 2:
+                # Estado que trata nomes
+                lexema = lexema + car
+                car = self.getChar()
+                if car is None or (not car.isalnum()):
+                    self.ungetChar(car)
+                    # Se não for palavra reservada, então é ID
+                    if lexema in Lexico.reservadas:
+                        return Token(Lexico.reservadas[lexema], lexema, self.linha)
+                    else:
+                        return Token(TokenType.ID, lexema, self.linha)
+
+            elif estado == 3:
+                # Estado que trata números
+                lexema = lexema + car
+                car = self.getChar()
+                if car == '.' and lexema.__contains__('.'):
+                    self.ungetChar(car)
+                    return Token(TokenType.ERROR, lexema, self.linha)
+                if car is None or not car.isdigit() and car != '.':
+                    self.ungetChar(car)
+                    return Token(TokenType.CTE, lexema, self.linha)
+
+            elif estado == 4:
+                return Token(TokenType.ATRIB, lexema, self.linha)
+
+            elif estado == 5:
+                # Estado que trata cadeias
+                lexema = lexema + car
+                car = self.getChar()
+
+                if car is None:
+                    return Token(TokenType.ERROR, lexema, self.linha)
+                if car == '"':
+                    lexema = lexema + car
+                    return Token(TokenType.CADEIA, lexema, self.linha)
+
+            elif estado == 6:
+                lexema = lexema + car
+                car = self.getChar()
+                if car not in {'>', '<', '='}:
+                    self.ungetChar(car)
+                    return Token(TokenType.OPREL, lexema, self.linha)
+                else:
+                    lexema = lexema + car
+                    if lexema in {'==', '<=', '>=', '<>'}:
+                        return Token(TokenType.OPREL, lexema, self.linha)
+                    else:
+                        return Token(TokenType.ERROR, lexema, self.linha)
+
+            elif estado == 7:
+                lexema = lexema + car
+                return Token(TokenType.OPAD, lexema, self.linha)
+
+            elif estado == 8:
+                lexema = lexema + car
+                return Token(TokenType.OPMUL, lexema, self.linha)
+
+            elif estado == 9:
+                lexema = lexema + car
+                return Token(TokenType.OPNEG, lexema, self.linha)
+
+            elif estado == 10:
+                lexema = lexema + car
+                return Token(TokenType.PVIRG, lexema, self.linha)
+
+            elif estado == 11:
+                lexema = lexema + car
+                return Token(TokenType.DPONTOS, lexema, self.linha)
+
+            elif estado == 12:
+                lexema = lexema + car
+                return Token(TokenType.VIRG, lexema, self.linha)
+
+            elif estado == 13:
+                lexema = lexema + car
+                return Token(TokenType.ABREPAR, lexema, self.linha)
+
+            elif estado == 14:
+                lexema = lexema + car
+                return Token(TokenType.FECHAPAR, lexema, self.linha)
+
+            elif estado == 15:
+                lexema = lexema + car
+                return Token(TokenType.ABRECH, lexema, self.linha)
+
+            elif estado == 16:
+                lexema = lexema + car
+                return Token(TokenType.FECHACH, lexema, self.linha)
+            # Tratando '/'. Se o próximo token for diferente de / ou *, então o / é uma divisão, não um comentário.
+            elif estado == 17:
+                lexema = lexema + car
+                car = self.getChar()
+                if car is None or not re.match(r'[/*]', car):
+                    self.ungetChar(car)
+                    estado = 8
+                elif car == '/':
+                    estado = 18
+                else:
+                    estado = 19
+            # Se for um comentário inline
+            elif estado == 18:
+                car = self.getChar()
+                if car is None:
+                    return Token(TokenType.FIMARQ, '<eof>', self.linha)
+                # Se o caracter for qualquer caracter de espaçamento
+                elif re.match(r'\s', car):
+                    if car == '\n':
+                        self.linha = self.linha + 1
+                        lexema = ''
+                        estado = 1
+            # Se for um comentário em bloco
+            elif estado == 19:
+                lexema = lexema + car
+                car = self.getChar()
+                if car is None:
+                    return Token(TokenType.FIMARQ, '<eof>', self.linha)
+                # Se o caracter for qualquer caracter de espaçamento
+                elif re.match(r'\s', car):
+                    if car == '\n':
+                        self.linha = self.linha + 1
+                # Se achou o fim do comentário, retorna pro estado 1
+                elif re.search(r'([*]/)$', lexema):
+                    lexema = ''
+                    estado = 1
+
+if __name__== "__main__":
+
+   #nome = input("Entre com o nome do arquivo: ")
+   nome = './testes/exemplo2.txt'
+   lex = Lexico(nome)
+   lex.abreArquivo()
+
+   while(True):
+       token = lex.getToken()
+       print("token= %s , lexema= (%s), linha= %d" % (token.msg, token.lexema, token.linha))
+       if token.const == TokenType.FIMARQ[0]:
+           break
+   lex.fechaArquivo()

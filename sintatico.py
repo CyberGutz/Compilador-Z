@@ -16,8 +16,9 @@ class Sintatico:
             self.lex.abreArquivo()
             self.tokenAtual = self.lex.getToken()
 
-            self.PROG()
+            self.EMPTY()
             self.consome(tt.FIMARQ)
+            print("Análise Executada com Sucesso !")
             self.lex.fechaArquivo()
 
     def atualIgual(self, token):
@@ -32,6 +33,13 @@ class Sintatico:
             print('ERRO DE SINTAXE [linha {}]: era esperado {} mas veio {}'.format(self.tokenAtual.linha, msg,
                                                                                    self.tokenAtual.lexema))
             quit()
+
+    # Não retorna erro quando o arquivo for vazio.
+    def EMPTY(self):
+        if self.atualIgual(tt.PROGRAM):
+            self.PROG()
+        else:
+            pass
 
     def PROG(self):
         self.consome(tt.PROGRAM)
@@ -120,7 +128,7 @@ class Sintatico:
             self.LEIA()
         elif self.atualIgual(tt.WRITE):
             self.ESCREVA()
-        elif self.atualIgual(tt.ATRIB):
+        elif self.atualIgual(tt.ID):
             self.ATRIBUICAO()
 
     def SE(self):
@@ -133,7 +141,8 @@ class Sintatico:
 
     def H(self):
         # First(C_COMP) = abrech
-        if self.atualIgual(tt.ABRECH):
+        if self.atualIgual(tt.ELSE):
+            self.consome(tt.ELSE)
             self.C_COMP()
         else:
             pass
